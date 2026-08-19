@@ -17,7 +17,8 @@ bench.sh - measure local latency/throughput constants
   -h, --help    this text
 
 Optional: set BENCH_PG_DSN to a libpq DSN to measure Postgres point-query QPS.
-All metrics print a row; unavailable ones print status=skipped with a reason.
+Every metric listed by --describe prints exactly one row, in that order;
+unavailable ones print status=skipped with a reason. Never silence.
 USAGE
 }
 
@@ -56,18 +57,47 @@ printf 'schema=bench.v1\thost=%s\tas_of=%s\n' "$(uname -sm | tr ' ' '-')" "$(dat
 printf 'metric\tvalue\tunit\tstatus\tmethod\n'
 
 SIZE_MB="$SIZE_MB" WORKDIR="$WORKDIR" python3 - <<'PY'
-import os, socket, statistics, tempfile, threading, time
+import atexit, os, socket, statistics, tempfile, threading, time
 
 MB = 1024 * 1024
 size = int(os.environ["SIZE_MB"]) * MB
 workdir = os.environ["WORKDIR"]
 
+# Declared order is the contract: --describe lists these, and every one of them
+# emits exactly one row even when its section dies early.
+DECLARED = [
+    ("mem_bandwidth", "GB/s"), ("mem_read_1mb", "us"),
+    ("disk_seq_write", "MB/s"), ("disk_seq_read_1mb", "us"),
+    ("disk_random_read_4k", "us"), ("fsync_latency", "us"),
+    ("loopback_rtt", "us"), ("pg_point_query", "QPS"),
+]
+rows = {}
+
+def clean(text):
+    return " ".join(str(text).split())[:120] or "unknown"
+
 def emit(metric, value, unit, status="ok", method=""):
     v = f"{value:.1f}" if isinstance(value, float) else str(value)
-    print(f"{metric}\t{v}\t{unit}\t{status}\t{method}", flush=True)
+    rows[metric] = f"{metric}\t{v}\t{unit}\t{status}\t{method}"
 
 def skip(metric, unit, reason):
-    print(f"{metric}\t-\t{unit}\tskipped\t{reason}", flush=True)
+    rows[metric] = f"{metric}\t-\t{unit}\tskipped\t{clean(reason)}"
+
+def why(exc):
+    return f"{type(exc).__name__}: {clean(exc)}"
+
+_flushed = False
+
+def flush_table():
+    # atexit so an unexpected crash still yields a complete, parseable table
+    global _flushed
+    if _flushed:
+        return
+    _flushed = True
+    for metric, unit in DECLARED:
+        print(rows.get(metric, f"{metric}\t-\t{unit}\tskipped\tnot-reached"), flush=True)
+
+atexit.register(flush_table)
 
 # memory bandwidth
 try:
@@ -82,7 +112,7 @@ try:
     emit("mem_bandwidth", gbs, "GB/s", method="memoryview-copy")
     emit("mem_read_1mb", (MB / (gbs * 1e9)) * 1e6, "us", method="derived")
 except Exception as e:
-    skip("mem_bandwidth", "GB/s", type(e).__name__)
+    skip("mem_bandwidth", "GB/s", why(e))
 
 # file IO
 path = None
@@ -123,7 +153,7 @@ try:
         syncs.append((time.perf_counter() - t) * 1e6)
     emit("fsync_latency", statistics.median(syncs), "us", method="4K-write+fsync")
 except Exception as e:
-    skip("disk_seq_write", "MB/s", type(e).__name__)
+    skip("disk_seq_write", "MB/s", why(e))
 finally:
     if path:
         try:
@@ -155,7 +185,7 @@ try:
     cli.close(); srv.close()
     emit("loopback_rtt", statistics.median(rtts), "us", method="tcp-nodelay-median")
 except Exception as e:
-    skip("loopback_rtt", "us", type(e).__name__)
+    skip("loopback_rtt", "us", why(e))
 
 # postgres
 dsn = os.environ.get("BENCH_PG_DSN")
@@ -175,7 +205,9 @@ else:
     except ImportError:
         skip("pg_point_query", "QPS", "psycopg-not-installed")
     except Exception as e:
-        skip("pg_point_query", "QPS", type(e).__name__)
+        skip("pg_point_query", "QPS", why(e))
+
+flush_table()
 PY
 
 echo "done" >&2
