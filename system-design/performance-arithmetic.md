@@ -12,7 +12,7 @@ only ground truth. Each rule is checkable against your own diff.*
 
 4. **IO inside a loop over user-controlled N is a defect until you state the bound on N.** 100 iterations x 0.5 ms round trip = 50 ms, which is an entire latency budget spent in a loop that reads as harmless. Grep your own diff for a query, an HTTP call, or a file read nested inside an iteration before you call the change done.
 
-5. **Never put an LLM call on a synchronous request path.** Time-to-first-token is ~1 s against a hosted frontier model; every other operation in the table below is measured in microseconds. It is four orders of magnitude out of band — it belongs behind a queue, a stream, or a cache, never between a user's click and their response.
+5. **Never put an LLM call on a synchronous request path.** Time-to-first-token is ~1 s against a hosted frontier model. A same-zone round trip is 300 us and a warm indexed query 0.5 ms, so one token alone lands three orders of magnitude beyond the operations a request budget is actually built from, and a short response at ~3 s is closer to four. It belongs behind a queue, a stream, or a cache, never between a user's click and their response.
 
 6. **Prefer the change that removes work over the change that adds capacity.** Collapsing an N+1 into one join beats provisioning a read replica: it is cheaper, it is reversible, and it does not add a component. Reach for more hardware only after the wasteful work is gone.
 
@@ -28,11 +28,11 @@ only ground truth. Each rule is checkable against your own diff.*
 
 12. **Two services that must be deployed together to avoid breaking are one service.** Merge them. This is the checkable form of "distributed monolith" — you can evaluate it against a release process, whereas the label alone you cannot.
 
-13. **Sequential still beats random by two orders of magnitude, NVMe included.** Sort keys and batch reads before you optimize anything further up the stack. The gap narrowed against spinning disks; it did not close.
+13. **Sequential still beats random by more than an order of magnitude, NVMe included.** Check it against the table below: 1 MB sequentially from NVMe in 150 us is ~6.8 GB/s, while 4K random reads at 15 us each is ~270 MB/s — about 25x. Sort keys and batch reads before you optimize anything further up the stack. The gap narrowed against spinning disks; it did not close.
 
 14. **State the condition under which your design breaks.** Every choice has a losing case — 10x the data, a second region, a strict-consistency requirement. Naming it converts an unfalsifiable recommendation into one a human can accept or reject, and it is the part reviewers most often find missing.
 
-15. **Treat every constant below as order-of-magnitude and check its date.** These rot: disk seek fell three orders of magnitude when NVMe landed, and datacenter round trips now beat local spinning-disk reads. Re-derive on the target hardware with `scripts/bench.sh` before any number drives a decision you cannot cheaply reverse.
+15. **Treat every constant below as order-of-magnitude and check its date.** These rot: disk seek fell from milliseconds to microseconds when NVMe landed, and datacenter round trips now beat local spinning-disk reads. Re-derive on the target hardware with `scripts/bench.sh` before any number drives a decision you cannot cheaply reverse.
 
 ## Constants
 

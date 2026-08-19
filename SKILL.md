@@ -22,6 +22,10 @@ Reference playbook of hard-won rules for agent work. Load the relevant reference
 
 ## Scripts
 
-`scripts/bench.sh` re-derives the constants in `system-design/performance-arithmetic.md`
-on the current machine. Run it before any constant drives a decision that is expensive
-to reverse. `--describe` lists the metrics and exit codes.
+`scripts/bench.sh` re-derives *several* of the constants in
+`system-design/performance-arithmetic.md` on the current machine — memory, storage,
+loopback, and Postgres point-query throughput. The rest of the table it does not
+measure, and an unmeasured row is not a validated one. Run it before any constant
+drives a decision that is expensive to reverse, and read the status column: only
+`status=ok` is safe to substitute back into the table. `--describe` lists the
+metrics, statuses, and exit codes.
