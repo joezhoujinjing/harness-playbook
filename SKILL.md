@@ -1,6 +1,6 @@
 ---
 name: harness-playbook
-description: "Design philosophy and best practices for building AI agent tooling. Use when designing or reviewing CLIs, APIs, or developer tools that AI agents will consume — covers output brevity, JSON mode, idempotency, exit codes, error structure, and non-interactive operation."
+description: "Design philosophy and best practices for building AI agent tooling. Use when designing or reviewing CLIs, APIs, or developer tools that AI agents will consume — covers CLI-vs-MCP choice, line-oriented output, output brevity, artifact-to-disk patterns, exit codes, error structure, idempotency, self-check subcommands, and non-interactive operation."
 ---
 
 # Harness Playbook
@@ -11,7 +11,7 @@ Reference playbook of design philosophy for AI agent tooling. Load the relevant 
 
 | File | When to use |
 |------|-------------|
-| `design-philosophy/agent-friendly-cli.md` | Designing, building, or reviewing a CLI that an AI agent will invoke |
+| `design-philosophy/agent-friendly-cli.md` | Designing, building, or reviewing a CLI that an AI agent will invoke — also covers when to build an MCP server instead |
 
 ## Workflow
 
